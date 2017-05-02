@@ -1,7 +1,8 @@
 defmodule Hashtree do
 
   @moduledoc """
-  This module generates MerkleRoot and MerklePath. And it also verifies data given in the argument.
+  This module generates MerkleRoot and MerklePath. 
+  And it also validates data with MerkleRoot and MerklePath. 
   SHA256 is used for the hashing.
   """
 
@@ -90,7 +91,7 @@ defmodule Hashtree do
 			{:right, value} ->
 			  {update_auth(:right, auth, h, value), update_stack(stack, auth_at_right(leaf), fullnodes, h)}
 			_ ->
-			  raise ArgumentError, message: "the argument value is invalid"
+			  update_both(auth, stack, fullnodes, leaf, h + 1)
 		      end
       update_both(auth, stack, fullnodes, leaf, h + 1)
     else
@@ -100,9 +101,10 @@ defmodule Hashtree do
   
   defp gen_merkle_path({current_auth, acc}, stack, fullnodes, size, leaf) when leaf < size do
     {new_auth, stack} = update_both(current_auth, stack, fullnodes, leaf, 0)
+    if leaf + 1 == size, do: acc, else:
     gen_merkle_path({new_auth, acc ++ [new_auth]}, stack, fullnodes, size, leaf + 1)
   end
-
+  
   defp gen_merkle_path({_auth, acc}, _stack, _fullnodes, size, leaf) when leaf == size do
     acc
   end
@@ -136,7 +138,7 @@ defmodule Hashtree do
   @spec merkle_path(list) :: list
   def merkle_path(data) do
     fullnodes = gen_fullnodes(data)
-    gen_merkle_path({auth0(fullnodes), [auth0(fullnodes)]}, stack0(fullnodes), fullnodes, length(fullnodes), 0)
+    gen_merkle_path({auth0(fullnodes), [auth0(fullnodes)]}, stack0(fullnodes), fullnodes, length(data), 0)
   end
 
   defp join({:left, x}, acc), do: sha256(x <> acc)
@@ -158,8 +160,8 @@ defmodule Hashtree do
       {:ok, "b"}
   """
   @spec verify(String.t, String.t, list) :: {:ok, String.t} | {:error, String.t}
-  def verify(target, root, path) do
-    if root == path |>
+  def verify(target, root, auth_path) do
+    if root == auth_path |>
       Enum.reduce(sha256(target), &join(&1, &2)) do
       {:ok, target}
     else
